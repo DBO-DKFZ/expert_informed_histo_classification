@@ -1,0 +1,6 @@
+EarlyStopping:
+  _target_: lightning.pytorch.callbacks.EarlyStopping
+  monitor: ${metric}
+  mode: ${mode}
+  min_delta: 0.0001
+  patience: 5 # note: this usually is after each epoch, but actually depends on the Trainer, e.g. if "check_val_every_n_epoch" and "val_check_interval" are set different to default

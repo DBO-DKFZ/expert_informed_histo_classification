@@ -1,0 +1,158 @@
+defaults:
+- metrics:  # https://lightning.ai/docs/torchmetrics/stable/
+  - AUROC
+  - Accuracy
+  - F1Score
+- callbacks: # useful link: https://lightning.ai/docs/pytorch/stable/api_references.html#callbacks
+  # Note, that LearningRateMonitor('epoch') is added automatically. You can override it, by setting LearningRateMonitor here.
+  - EarlyStopping
+  - ModelCheckpoint
+- _self_
+
+job: test # train, tune, test, convert_hdf5
+metric: val_loss
+mode: min # whether to max or min the metric
+checkpoint: models/HistoMajority.ckpt
+
+task:
+  classification_task: multiclass
+  num_classes: 3
+
+loss:
+  _target_: torch.nn.CrossEntropyLoss
+  weight:
+    _target_: torch.tensor
+    _args_: [[1.5, 2., 1.]]
+
+dataset:
+  data_set:
+    _target_: hydra.utils.get_class
+    path: datasets.HDF5GraphClassification
+  data_dir: data/tcga-demo.hdf5
+  graph_data: True
+  transform_train_gpu:
+    _target_: torch_geometric.transforms.Compose
+    transforms:
+      - _target_: torch_geometric.transforms.NormalizeFeatures
+  transform_test_gpu:
+    _target_: torch_geometric.transforms.Compose
+    transforms:
+      - _target_: torch_geometric.transforms.NormalizeFeatures
+
+split:
+  mode: single
+  stratify: True
+  kwargs:
+    train_size: 0.8
+
+model:
+  _target_: models.GNN
+  gnn:
+    in_out: 'x, edge_index, edge_weight, edge_attr, batch -> x'
+    module:
+      _target_: torch_geometric.nn.models.GCN
+      in_channels: 512
+      hidden_channels: 512
+      num_layers: 3
+      out_channels: 256
+      dropout: ${hyper.dropout}
+      act: relu
+      norm: BatchNorm
+  pool:
+    pool1:
+        in_out: 'x, edge_index, edge_weight, batch -> x, edge_index, edge_weight, batch, index'
+        module:
+          _target_: torch_geometric.nn.pool.ASAPooling
+          in_channels: ${model.gnn.module.out_channels}
+          ratio: 0.5
+    # Add this if using positional encoding & another pooling beforehand
+    #pool2:
+    #  in_out: 'pos, index -> pos'
+    #  module:
+    #    _target_: hydra.utils.get_method
+    #    path: models.reduce_position
+    pool_final:
+      in_out:  'x, batch, pos -> x'
+      module:
+        _target_: models.TransformerAggregation
+        d_model: ${model.gnn.module.out_channels}
+        nhead: 8
+        num_layers: 3
+        dropout: ${hyper.dropout}
+        pos_enc: False
+  head:
+    _target_: torch.nn.Linear
+    in_features: ${model.gnn.module.out_channels}
+    out_features: ${task.num_classes}
+
+scheduler:
+  _target_: ray.tune.schedulers.ASHAScheduler
+
+lr_scheduler:
+  _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+  T_0: 5
+
+# use temperature scaling (currently only used in test.py)
+temp_scaling:
+  use: True
+  value:
+    _target_: torch.tensor
+    _args_: [[2.25463799, 1.47872218, 2.1373289]]
+
+# trainer parameters
+trainer_params:
+  max_epochs: 50
+  precision: 16-mixed # "16-mixed" for mixed precision, "32-true" for 32-bit precision, etc. Can also specify "bf16-mixed" or "bf16-true", ...
+  sync_batchnorm: True # whether to sync batch norm layers. Only relevant for multi-gpu training
+  deterministic: True
+
+# TRAINING
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 8.445592888140261e-05
+  weight_decay: 0.0019304002647327835
+batch_size: 2
+hyper:
+  dropout: 0.5
+accumulate_grad_batches: 16
+
+# https://github.com/Schinkikami/PyT-ImbalancedDatasetSampler
+imbalanced_sampler:
+  use: False
+  kwargs:
+    num_classes: ${task.num_classes}
+    sampling_factor: 0.7
+
+resources:
+  num_workers: 1  # number of workers per training when tuning (each trial gets this number, so be careful!)
+  cpu_worker: 4 # CPUs per worker
+  gpu_worker: 1 # GPUs per worker
+
+# any hyperparameter specified here will override the parameter if it was set before
+# instantiates like {param: _target_(_args_)} (e.g.: lr: _target_: ray.tune.loguniform _args_: [1e-4, 1e-1] -> {lr: ray.tune.loguniform(1e-4, 1e-1)})
+# note: elements passed as a list in _args_ are treated as individual arguments -> use a list of lists to pass a list as an argument
+hyperparameter_tuning:
+  optimizer:
+    lr:
+      _target_: ray.tune.loguniform
+      _args_: [1e-6, 1e-3]
+    weight_decay:
+      _target_: ray.tune.loguniform
+      _args_: [1e-5, 1e-3]
+
+# refer to https://docs.ray.io/en/latest/tune/api/doc/ray.tune.TuneConfig.html
+tune_config:
+  search_alg:
+    _target_: ray.tune.search.optuna.OptunaSearch
+  kwargs:
+    metric: ${metric}
+    mode: ${mode}
+    num_samples: 80
+
+run_config:
+  checkpoint_config:
+    _target_: ray.air.config.CheckpointConfig
+    num_to_keep: 1
+    checkpoint_score_attribute: ${metric}
+    checkpoint_score_order: ${mode}
+

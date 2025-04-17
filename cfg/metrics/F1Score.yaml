@@ -1,0 +1,5 @@
+F1Score:
+  _target_: torchmetrics.F1Score
+  task: ${task.classification_task}
+  num_classes: ${task.num_classes}
+  average: macro

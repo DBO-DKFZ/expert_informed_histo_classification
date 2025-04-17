@@ -1,0 +1,9 @@
+ModelCheckpoint:
+  _target_: lightning.pytorch.callbacks.ModelCheckpoint
+  dirpath:
+    _target_: ray.air.session.get_trial_dir
+  monitor: ${metric}
+  mode: ${mode}
+  filename: "{epoch}-{step}-{${metric}:.4f}"
+  save_top_k: 2
+  every_n_epochs: 1
