@@ -8,7 +8,7 @@ This code is developed and maintained by [*Heinlein, L.*](https://github.com/V3r
 
 The following sections include instructions for installation, running a demo, and preparing your own dataset for model training, tuning, or evaluation.
 
-The specific configurations for the model trained on one-hot encoded majority votes [`models/HistoMajority.ckpt`](./models/HistoMajority.ckpt) and for the model trained on reviewer uncertainties as soft labels [`models/HistoMajority.ckpt`](./models/HistoSoftLabel.ckpt) are available in [`cfg/config.yaml`](./cfg/config.yaml) and [`cfg/config_soft.yaml`](./cfg/config_soft.yaml), respectively.
+The specific configurations for the model trained on one-hot encoded majority votes [`models/HistoMajority.ckpt`](./models/HistoMajority.ckpt) and for the model trained on reviewer uncertainties as soft labels [`models/HistoSoftLabels.ckpt`](./models/HistoSoftLabels.ckpt) are available in [`cfg/config.yaml`](./cfg/config.yaml) and [`cfg/config_soft.yaml`](./cfg/config_soft.yaml), respectively.
 
 ## Pipeline overview
 
