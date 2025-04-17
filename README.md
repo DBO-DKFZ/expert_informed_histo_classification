@@ -22,6 +22,13 @@ The code was tested on an Ubuntu 22.04.5 as well as an Ubuntu 24.04.2 system wit
 
 **Note:** an active internet connection is required.
 
+**Note 2:** This repository uses `git-lfs` to handle large files, such as the checkpoint for the classifier trained on soft labels. To ensure proper cloning, install and set up Git LFS with:
+
+```bash
+sudo apt install git-lfs
+git lfs install
+```
+
 First, if Python 3.11 and `venv` are not already installed, you can install them via `apt`:
 
 ```bash
