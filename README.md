@@ -1,8 +1,8 @@
-# expert_knowledge_histo_classification
+# Expert-informed histopathological classifier
 
 This repository provides code to test, train, and tune graph neural networks for histopathological image analysis, and accompanies the paper:
 
-**Expert-knowledge-embedded melanoma classification with dermoscopic and histopathologic data: Results and recommendations for practice**, *Haggenmüller, S.; Heinlein, L.; Abels, J.; et al.*, Conference/Journal TBD, 2025
+**Expert-informed melanoma classification with dermoscopic and histopathologic data: Results and recommendations for practice**, *Haggenmüller, S.; Heinlein, L.; Abels, J.; et al.*, Conference/Journal TBD, 2025
 
 This code is developed and maintained by [*Heinlein, L.*](https://github.com/V3ritate).
 
