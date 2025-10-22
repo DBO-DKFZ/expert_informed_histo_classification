@@ -1,10 +1,11 @@
+import ast
 from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
-from torchmetrics.functional import auroc, accuracy, f1_score
+from torchmetrics.functional import auroc, accuracy, f1_score, precision, specificity, kl_divergence
 
 RANDOM_STATE = 42
 
@@ -63,11 +64,44 @@ def ci(y_true: pd.DataFrame, y_pred: pd.DataFrame, patient_ids: pd.DataFrame, fu
     return ret
 
 
+def brier_score(probs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+    """
+    Calculates the (macro) Brier score (mean of mse per class).
+
+    :param probs: predicted probabilities
+    :param targets: target labels
+    :return: the Brier score
+    """
+    # ensure probs are valid
+    if probs.dim() != 2:
+        raise ValueError("`probs` must be of shape (N, C)")
+    N, C = probs.shape
+
+    # if 1 dim vector (i.e. hard-labels), transform to one hot
+    if targets.dim() == 1:
+        targets_oh = torch.nn.functional.one_hot(targets.to(int), num_classes=C).float()
+    elif targets.shape == probs.shape:
+        targets_oh = targets.float()
+    else:
+        raise ValueError("`targets` must be shape (N,) or (N, C)")
+
+    # Brier score: mse per class, mean of that
+    brier = torch.nn.functional.mse_loss(probs, targets_oh, reduction="none").mean(dim=0).mean()
+    return brier
+
+
 
 function_clswise = lambda x: auroc(torch.tensor(np.stack(x.iloc[:, 1].tolist())), torch.tensor(x.iloc[:, 0].values, dtype=torch.int), num_classes=3, average=None, task='multiclass')
 functions = {'AUROC': lambda x: auroc(torch.tensor(np.stack(x.iloc[:, 1].tolist())), torch.tensor(x.iloc[:, 0].values, dtype=torch.int), num_classes=3, average='macro', task='multiclass'),
              'Acc.': lambda x: accuracy(torch.tensor(np.stack(x.iloc[:, 1].tolist())), torch.tensor(x.iloc[:, 0].values, dtype=torch.int), num_classes=3, average='macro', task='multiclass'),
-             'F1': lambda x: f1_score(torch.tensor(np.stack(x.iloc[:, 1].tolist())), torch.tensor(x.iloc[:, 0].values, dtype=torch.int), num_classes=3, average='macro', task='multiclass')}
+             'F1': lambda x: f1_score(torch.tensor(np.stack(x.iloc[:, 1].tolist())), torch.tensor(x.iloc[:, 0].values, dtype=torch.int), num_classes=3, average='macro', task='multiclass'),
+             'Precision': lambda x: precision(torch.tensor(np.stack(x.iloc[:, 1].tolist())), torch.tensor(x.iloc[:, 0].values, dtype=torch.int), num_classes=3, average='macro', task='multiclass'),
+             'Specificity': lambda x: specificity(torch.tensor(np.stack(x.iloc[:, 1].tolist())), torch.tensor(x.iloc[:, 0].values, dtype=torch.int), num_classes=3, average='macro', task='multiclass'),
+             'Brier score (majority-vote based)': lambda x: brier_score(torch.nn.functional.softmax(torch.tensor(np.stack(x.iloc[:, 1].tolist())), dim=1), torch.tensor(x.iloc[:, 0].values, dtype=torch.int)),
+             }
+functions_soft = {'Brier score (soft-label based)': lambda x: brier_score(torch.nn.functional.softmax(torch.tensor(np.stack(x.iloc[:, 1].tolist())), dim=1), torch.tensor(np.stack(x.iloc[:, 0].tolist()))),
+                  'KL Divergence': lambda x: kl_divergence(torch.nn.functional.softmax(torch.tensor(np.stack(x.iloc[:, 1].tolist())), dim=1)+1e-12, torch.tensor(np.stack(x.iloc[:, 0].tolist()))+1e-12),
+                  }
 
 
 filenames = Path('./predictions').rglob('*.csv')
@@ -86,6 +120,7 @@ for file in filenames:
     patient_ids = df['patientId']
 
     # calculate each metric + CI that is in functions
+    print('Majority-votes as targets')
     for key, func in functions.items():
         print(f"{key}: {func(pd.merge(df['3'], preds, left_index=True, right_index=True))}, "
               f"95% CI {ci(y_true=df['3'], y_pred=preds, patient_ids=patient_ids, function=func)}")
@@ -93,7 +128,15 @@ for file in filenames:
     # calculate class-wise function
     print(f"AUROC class-wise: {function_clswise(pd.merge(df['3'], preds, left_index=True, right_index=True))}, "
           f"95% CI {ci(y_true=df['3'], y_pred=preds, patient_ids=patient_ids, function=function_clswise, class_wise=True)}")
-          
+
+    # calculate functions on soft-labels (if existing)
+    if 'soft_labels' in df.columns:
+        print('Soft-labels as targets')
+        df['soft_labels'] = df['soft_labels'].apply(ast.literal_eval)
+        for key, func in functions_soft.items():
+            print(f"{key}: {func(pd.merge(df['soft_labels'], preds, left_index=True, right_index=True))}, "
+                  f"95% CI {ci(y_true=df['soft_labels'], y_pred=preds, patient_ids=patient_ids, function=func)}")
+
     print('=============================')
     print('=============================')
 

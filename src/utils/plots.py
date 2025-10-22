@@ -254,7 +254,7 @@ def plot_data(rows: list[str], cols: list[str], files: list[list[str | Path]], c
     for row_idx, row in enumerate(rows):
         data_1d = []
         for col_idx, col in enumerate(cols):
-            data_1d.append(PlotData(title=rf'$\bf{{{index[i]}}}$ {row} - {col}', data=pd.read_csv(files[row_idx][col_idx], index_col=0), labels=class_labels))
+            data_1d.append(PlotData(title=rf'$\bf{{{index[i]}}}$ {row} - {col}', data=pd.read_csv(files[row_idx][col_idx], index_col=0).drop('soft_labels', axis=1, errors='ignore'), labels=class_labels))
             i += 1
         data_2d.append(data_1d)
 
