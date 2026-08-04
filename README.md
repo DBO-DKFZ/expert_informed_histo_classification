@@ -2,7 +2,9 @@
 
 This repository provides code to test, train, and tune graph neural networks for histopathological image analysis, and accompanies the paper:
 
-**Expert-informed melanoma classification with dermoscopic and histopathologic data: Results and recommendations for practice**, *Haggenmüller, S.; Heinlein, L.; Abels, J.; et al.*, Conference/Journal TBD, 2025
+**Expert-informed artificial intelligence for melanoma classification using dermoscopic and histopathologic data**<br>
+*Haggenmüller, S.; Heinlein, L.; Abels, J.; et al.*<br>
+*Nature Communications* (2026)
 
 This code is developed and maintained by [*Heinlein, L.*](https://github.com/V3ritate).
 
